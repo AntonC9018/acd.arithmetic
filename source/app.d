@@ -5,6 +5,17 @@ enum OperatorArity
 {
 	unary = 1,
 	binary = 2,
+	unaryOrBinary = unary | binary,
+}
+
+bool isUnary(OperatorArity arity)
+{
+	return (arity & OperatorArity.unary) != 0;
+}
+
+bool isBinary(OperatorArity arity)
+{
+	return (arity & OperatorArity.binary) != 0;
 }
 
 enum OperatorAssociativity
@@ -23,8 +34,14 @@ struct Operator
 
 struct StreamPosition
 {
-	size_t line;
-	size_t column;
+	size_t line = 0;
+	size_t column = 0;
+}
+
+struct StreamSpan
+{
+	StreamPosition start;
+	StreamPosition end;
 }
 
 enum TokenKind
@@ -38,8 +55,10 @@ enum TokenKind
 
 struct Token
 {
-	StreamPosition startPosition;
-	StreamPosition endPosition;
+	StreamSpan span;
+	ref inout(StreamPosition) startPosition() inout return{ return span.start; }
+	ref inout(StreamPosition) endPosition() inout return{ return span.end; }
+
 	string text;
 	TokenKind kind;
 	union
@@ -48,13 +67,15 @@ struct Token
 		long integer;
 		double floating;
 	}
+
+
 }
 
 // TODO: use allocator here, oor prealloc statically.
 struct DynamicArray(T)
 {
-	T[] data;
-	size_t length;
+	private T[] data;
+	private size_t length;
 
 	this(size_t initialCapacity)
 	{
@@ -106,6 +127,11 @@ private struct ArithmeticLexerRange(TRange)
 	private Token _currentToken = Token.init;
 	private bool _empty = false;
 	private DynamicArray!(Operator*) _matchingOperatorsCache;
+	
+	StreamPosition streamPosition() const
+	{
+		return _currentPosition;
+	}
 
 	bool empty() const
 	{
@@ -167,9 +193,10 @@ private struct ArithmeticLexerRange(TRange)
 		}
 
 		size_t startColumn = _currentPosition.column;
+		_currentToken.startPosition = _currentPosition;
+
 		const f = _input.front;
 		popSingleCharacter();
-		_currentToken.startPosition = _currentPosition;
 
 		if (isAlpha(f) || f == '_')
 		{
@@ -213,7 +240,7 @@ private struct ArithmeticLexerRange(TRange)
 		}
 		else
 		{
-			_matchingOperatorsCache.length = 0;
+			_matchingOperatorsCache.clear();
 			foreach (ref op; _operators.filter!(op => op.name[0] == f))
 				_matchingOperatorsCache ~= &op;
 
@@ -226,13 +253,13 @@ private struct ArithmeticLexerRange(TRange)
 				Operator* op = _matchingOperatorsCache[0];
 				{
 					// Matches the longest possible operator.
-					if (_matchingOperatorsCache.data[].any!(op => op.name.length > 1))
+					if (_matchingOperatorsCache.sliceTemp[].any!(op => op.name.length > 1))
 					{
 						size_t index = 1;
 						while (!_input.empty)
 						{
 							auto data = _matchingOperatorsCache.sliceTemp;
-							_matchingOperatorsCache.length = 0;
+							_matchingOperatorsCache.clear();
 							foreach (op1; data[])
 							{
 								if (op1.name.length > index && op1.name[index] == _input.front)
@@ -282,6 +309,11 @@ private struct BufferingArithmeticLexer(TLexerRange,
 	private TLexerRange _lexerRange;
 	private mixin AllocatorState!TAllocator;
 	private TCyclicTokenPointerBuffer _buffer;
+
+	StreamPosition streamPosition() const
+	{
+		return _lexerRange.streamPosition();
+	}
 
 	Token* currentToken()
 	{
@@ -396,7 +428,7 @@ void writeTokenInfo(Token* token, const(string)[] operators)
 }
 
 
-enum ExpressionNodeKind
+enum SyntaxNodeKind
 {
 	operator,
 	identifier,
@@ -406,18 +438,29 @@ enum ExpressionNodeKind
 	floatLiteral,
 }
 
-struct ExpressionSyntaxNode
+struct SyntaxNode
 {
-	ExpressionNodeKind kind;
-	Token* token;
+	SyntaxNodeKind kind;
+
+	SyntaxNode* asSyntaxNode() return
+	{
+		return &this;
+	}
 }
 
-struct OperatorNode(size_t arity)
+struct ExpressionSyntaxNode
 {
-	ExpressionSyntaxNode expression;
-	alias expression this;
+	SyntaxNode node;
+	alias node this;
+}
 
-	ExpressionSyntaxNode*[arity] operands;
+struct OperatorNode
+{
+	SyntaxNode node;
+	alias node this;
+
+	SyntaxNode*[] operands;
+	Token* operatorToken;
 
 	inout(Operator*) operator() inout return
 	{
@@ -427,8 +470,10 @@ struct OperatorNode(size_t arity)
 
 struct IdentifierNode
 {
-	ExpressionSyntaxNode expression;
-	alias expression this;
+	SyntaxNode node;
+	alias node this;
+
+	Token* token;
 	
 	string name() const
 	{
@@ -438,12 +483,12 @@ struct IdentifierNode
 
 struct InvocationNode
 {
-	ExpressionSyntaxNode expression;
-	alias expression this;
+	SyntaxNode node;
+	alias node this;
 
 	IdentifierNode* identifier;
 	Token*[] delimiters;
-	ExpressionSyntaxNode*[] arguments;
+	SyntaxNode*[] arguments;
 	Token*[2] parentheses;
 
 	ref inout(Token*) openParenthesis() inout return
@@ -457,12 +502,12 @@ struct InvocationNode
 	}
 }
 
-struct ParenthesizedExpressionSyntaxNode
+struct ParenthesizedExpressionNode
 {
-	ExpressionSyntaxNode expression;
-	alias expression this;
+	SyntaxNode node;
+	alias node this;
 
-	ExpressionSyntaxNode* innerExpression;
+	SyntaxNode* innerExpression;
 	Token*[2] parentheses;
 
 	ref inout(Token*) openParenthesis() inout return
@@ -474,12 +519,20 @@ struct ParenthesizedExpressionSyntaxNode
 	{
 		return parentheses[1];
 	}
+}
+
+struct LiteralNode
+{
+	SyntaxNode node;
+	alias node this;
+
+	Token* token;
 }
 
 struct IntegerLiteralNode
 {
-	ExpressionSyntaxNode expression;
-	alias expression this;
+	LiteralNode literal;
+	alias literal this;
 
 	long integer() const
 	{
@@ -489,8 +542,8 @@ struct IntegerLiteralNode
 
 struct FloatLiteralNode
 {
-	ExpressionSyntaxNode expression;
-	alias expression this;
+	LiteralNode literal;
+	alias literal this;
 
 	double floating() const
 	{
@@ -498,40 +551,40 @@ struct FloatLiteralNode
 	}
 }
 
-OperatorNode!arity* operatorNode(arity, TAllocator)(TAllocator allocator, ExpressionSyntaxNode*[arity] operands, Token* operatorToken)
+OperatorNode* operatorNode(TAllocator)(TAllocator allocator, SyntaxNode*[] operands, Token* operatorToken)
 {
-	auto node = cast(OperatorNode!arity*) allocator.allocate(OperatorNode!arity.sizeof).ptr;
+	auto node = cast(OperatorNode*) allocator.allocate(OperatorNode.sizeof).ptr;
 	node.operands = operands;
-	node.token = operatorToken;
-	node.kind = ExpressionNodeKind.operator;
-	return ptr;
+	node.operatorToken = operatorToken;
+	node.kind = SyntaxNodeKind.operator;
+	return node;
 }
 
 IdentifierNode* identifierNode(TAllocator)(TAllocator allocator, Token* token)
 {
 	auto node = cast(IdentifierNode*) allocator.allocate(IdentifierNode.sizeof).ptr;
 	node.token = token;
-	node.kind = ExpressionNodeKind.identifier;
+	node.kind = SyntaxNodeKind.identifier;
 	return node;
 }
 
-InvocationNode* invocationNode(TAllocator)(TAllocator allocator, IdentifierNode* identifier, Token*[] delimiters, ExpressionSyntaxNode*[] arguments, Token*[2] parentheses)
+InvocationNode* invocationNode(TAllocator)(TAllocator allocator, IdentifierNode* identifier, Token*[] delimiters, SyntaxNode*[] arguments, Token*[2] parentheses)
 {
 	auto node = cast(InvocationNode*) allocator.allocate(InvocationNode.sizeof).ptr;
 	node.identifier = identifier;
 	node.delimiters = delimiters;
 	node.arguments = arguments;
 	node.parentheses = parentheses;
-	node.kind = ExpressionNodeKind.invocation;
+	node.kind = SyntaxNodeKind.invocation;
 	return node;
 }
 
-ParenthesizedExpressionSyntaxNode* parenthesizedExpressionNode(TAllocator)(TAllocator allocator, ExpressionSyntaxNode* innerExpression, Token*[2] parentheses)
+ParenthesizedExpressionNode* parenthesizedExpressionNode(TAllocator)(TAllocator allocator, SyntaxNode* innerExpression, Token*[2] parentheses)
 {
-	auto node = cast(ParenthesizedExpressionSyntaxNode*) allocator.allocate(ParenthesizedExpressionSyntaxNode.sizeof).ptr;
+	auto node = cast(ParenthesizedExpressionNode*) allocator.allocate(ParenthesizedExpressionNode.sizeof).ptr;
 	node.innerExpression = innerExpression;
 	node.parentheses = parentheses;
-	node.kind = ExpressionNodeKind.other;
+	node.kind = SyntaxNodeKind.parenthesizedExpression;
 	return node;
 }
 
@@ -539,7 +592,7 @@ IntegerLiteralNode* integerLiteralNode(TAllocator)(TAllocator allocator, Token* 
 {
 	auto node = cast(IntegerLiteralNode*) allocator.allocate(IntegerLiteralNode.sizeof).ptr;
 	node.token = token;
-	node.kind = ExpressionNodeKind.integerLiteral;
+	node.kind = SyntaxNodeKind.integerLiteral;
 	return node;
 }
 
@@ -547,9 +600,45 @@ FloatLiteralNode* floatLiteralNode(TAllocator)(TAllocator allocator, Token* toke
 {
 	auto node = cast(FloatLiteralNode*) allocator.allocate(FloatLiteralNode.sizeof).ptr;
 	node.token = token;
-	node.kind = ExpressionNodeKind.floatLiteral;
+	node.kind = SyntaxNodeKind.floatLiteral;
 	return node;
 }
+
+StreamSpan getWholeSpan(SyntaxNode* node)
+{
+	final switch (node.kind)
+	{
+		case SyntaxNodeKind.operator:
+		{
+			auto op = cast(OperatorNode*) node;
+			auto first = getWholeSpan(op.operands[0]);
+			auto last = getWholeSpan(op.operands[$ - 1]);
+			return StreamSpan(first.start, last.end);
+		}
+		case SyntaxNodeKind.identifier:
+		{
+			auto id = cast(IdentifierNode*) node;
+			return id.token.span;
+		}
+		case SyntaxNodeKind.invocation:
+		{
+			auto inv = cast(InvocationNode*) node;
+			return StreamSpan(inv.openParenthesis.span.start, inv.closeParenthesis.span.end);
+		}
+		case SyntaxNodeKind.parenthesizedExpression:
+		{
+			auto paren = cast(ParenthesizedExpressionNode*) node;
+			return StreamSpan(paren.openParenthesis.span.start, paren.closeParenthesis.span.end);
+		}
+		case SyntaxNodeKind.integerLiteral:
+		case SyntaxNodeKind.floatLiteral:
+		{
+			auto lit = cast(LiteralNode*) node;
+			return lit.token.span;
+		}
+	}
+}
+
 
 bool check(Token* token, string otherExpectedText)
 {
@@ -558,118 +647,204 @@ bool check(Token* token, string otherExpectedText)
 
 struct ExpressionSyntaxTree
 {
-	ExpressionSyntaxNode* root;
+	SyntaxNode* root;
 }
 
-struct Parser(TLexer, TAllocator)
+struct Parser(TLexer, TAllocator, alias ErrorHandler = writeln)
 {
 	private TLexer* _lexer;
 	private mixin AllocatorState!TAllocator;
+	private size_t _errorCount;
+
+	static if (is(ErrorHandler : T, T))
+		private ErrorHandler _errorHandler;
+	else
+		private alias _errorHandler = ErrorHandler;
+
+	private struct Location
+	{
+		StreamPosition position;
+		
+		void toString(scope void delegate(const(char)[]) sink) const
+		{
+			import std.format;
+			import std.range;
+			sink("at ");
+			formattedWrite!"%d"(sink, position.line);
+			sink(":");
+			formattedWrite!"%d"(sink, position.column + 1);
+		}
+	}
+
+	private void error(T...)(auto ref T args)
+	{
+		_errorCount++;
+		_errorHandler(args);
+	}
+
+	private void errorUnclosedParens(Token* openParen)
+	{
+		StreamPosition expectedPosition = _lexer.streamPosition;
+		error("Unclosed parenthesis ", Location(openParen.startPosition), " (expected one at ", expectedPosition, ")");
+	}
 
 	ExpressionSyntaxTree parse()
 	{
-		auto root = parseExpression();
+		int precedence = -1;
+		auto root = parseExpression(precedence);
+
+		auto nextToken = _lexer.peek();
+		if (nextToken !is null)
+			error("Unexpected token ", nextToken.text, " at ", Location(nextToken.startPosition));
 		return ExpressionSyntaxTree(root);
 	}
 
-	// TODO: check for null when reading tokens.
-	private ExpressionSyntaxNode* parseExpression()
+	private SyntaxNode* parseTerm()
 	{
 		auto token = _lexer.peek();
-		switch (token.kind)
-		{
-			default:
-				assert(false, "Asserting for now");
+		if (token is null)
+			return null;
 
+		final switch (token.kind)
+		{
 			case TokenKind.identifier:
 			{
 				auto maybeParen = _lexer.peek(2);
-				if (check(maybeParen, "("))
+
+				// Simple case, just an identifier.
+				if (maybeParen is null || !check(maybeParen, "("))
 				{
-					_lexer.popN(2);
-					ExpressionSyntaxNode*[] arguments;
-					Token*[] delimiters;
-					while (true)
-					{
-						auto arg = parseExpression();
-						arguments ~= arg;
-						auto maybeComma = _lexer.peek();
-
-						if (!check(maybeComma, ","))
-							break;
-						_lexer.pop();
-						delimiters ~= maybeComma;
-					}
-					auto maybeCloseParen = _lexer.peek();
-					if (!check(maybeCloseParen, ")"))
-						assert(false, "Asserting for now");
 					_lexer.pop();
-
-					return allocator.invocationNode(
-						identifierNode(allocator, token),
-						delimiters,
-						arguments,
-						[token, maybeCloseParen]);
+					return allocator.identifierNode(token).asSyntaxNode;
 				}
 
+				// Otherwise, we have an invocation.
+				_lexer.popN(2);
+				SyntaxNode*[] arguments;
+				Token*[] delimiters;
+				while (true)
+				{
+					// Separating arguments by commas resets their precedence.
+					int argPrecedence = -1;
+					auto arg = parseExpression(argPrecedence);
+					if (arg is null)
+					{
+						auto reportedLocation = delimiters.length > 0 ? delimiters[$ - 1].endPosition : maybeParen.startPosition;
+						reportedLocation.column += 1;
+						error("Expecting an argument to the invocation of ", token.text, " at ", Location(reportedLocation));
+						return null;
+					}
+					arguments ~= arg;
+
+					auto maybeComma = _lexer.peek();
+					if (maybeComma is null || !check(maybeComma, ","))
+						break;
+
+					_lexer.pop();
+					delimiters ~= maybeComma;
+				}
+				auto maybeCloseParen = _lexer.peek();
+				if (maybeCloseParen is null || !check(maybeCloseParen, ")"))
+				{
+					errorUnclosedParens(token);
+					return null;
+				}
 				_lexer.pop();
-				auto lhs = allocator.identifierNode(token);
-				return parseOperationOrReturnLHS(parent, lhs);
+
+				return allocator.invocationNode(
+					identifierNode(allocator, token),
+					delimiters,
+					arguments,
+					[token, maybeCloseParen])
+						.asSyntaxNode;
 			}
 			case TokenKind.other:
 			{
 				if (token.text == "(")
 				{
 					_lexer.pop();
-					auto innerExpression = parseExpression();
+
+					int precedence = -1;
+					auto innerExpression = parseExpression(precedence);
 					auto maybeCloseParen = _lexer.peek();
-					if (!check(maybeCloseParen, ")"))
-						assert(false, "Asserting for now");
+					if (maybeCloseParen is null || !check(maybeCloseParen, ")"))
+					{
+						errorUnclosedParens(token);
+						return null;
+					}
 					
 					_lexer.pop();
-					auto lhs = allocator.parenthesizedExpressionNode(innerExpression, [token, maybeCloseParen]);
-					return parseOperationOrReturnLHS(parent, lhs);
+					return allocator.parenthesizedExpressionNode(
+						innerExpression, [token, maybeCloseParen])
+							.asSyntaxNode;
 				}
-				assert(false, "Asserting for now");
+				error("Unrecognized kind of text ", token.text);
+				return null;
 			}
 			case TokenKind.integerLiteral:
 			{
 				_lexer.pop();
-				auto lhs = allocator.integerLiteralNode(token);
-				return parseOperationOrReturnLHS(parent, lhs);
+				return allocator.integerLiteralNode(token).asSyntaxNode;
 			}
 			case TokenKind.floatLiteral:
 			{
 				_lexer.pop();
-				auto lhs = allocator.floatLiteralNode(token);
-				return parseOperationOrReturnLHS(parent, lhs);
+				return allocator.floatLiteralNode(token).asSyntaxNode;
 			}
 			case TokenKind.operator:
 			{
-				if (token.operator.arity == OperatorArity.unary)
+				if (token.operator.arity.isUnary)
 				{
 					_lexer.pop();
-					auto rhs = parseExpression();
-					auto opLhs = allocator.unaryOperationNode(token, rhs);
-					return parseOperationOrReturnLHS(parent, opLhs);
-				}				
+					int precedence = -1;
+					auto rhs = parseExpression(precedence);
+					if (rhs is null)
+					{
+						error("Expected an expression after the unary operator ", token.text);
+						return null;
+					}
+					return allocator.operatorNode([rhs], token).asSyntaxNode;
+				}	
 			}
 		}
+		assert(false);
 	}
 
-	// Try parse binary operation.
-	OperatorNode!2* parseOperationOrReturnLHS(ExpressionSyntaxNode* left)
+	// TODO: introduce precedence conform to the the paper
+	// https://eli.thegreenplace.net/2012/08/02/parsing-expressions-by-precedence-climbing
+	private OperatorNode* parseBinaryOperation(SyntaxNode* lhs, ref int precedence)
 	{
-		// TODO: introduce precedence conform to the the paper
-		// https://eli.thegreenplace.net/2012/08/02/parsing-expressions-by-precedence-climbing
-		auto maybeOperator = _lexer.peek();
-		if (maybeOperator.kind != TokenKind.operator)
+		auto operatorToken = _lexer.peek();
+		if (operatorToken.kind != TokenKind.operator)
 			return null;
+		if (!operatorToken.operator.arity.isBinary)
 		{
-			_lexer.pop();
-			auto right = parseExpression();
-			return allocator.operatorNode([left, right][0..2], maybeOperator);
+			error("Expected a binary operator but found ", operatorToken.text, " at ", Location(operatorToken.startPosition));
+			return null;
 		}
+		_lexer.pop();
+
+		SyntaxNode* rhs;
+		if (precedence <= operatorToken.operator.precedence)
+			rhs = parseExpression(precedence);
+		else
+			rhs = parseTerm();
+		
+		if (rhs is null)
+		{
+			error("Expected an expression after the binary operator ", operatorToken.text, " at ", Location(operatorToken.startPosition));
+			return null;
+		}
+		return allocator.operatorNode([lhs, rhs], operatorToken);
+	}
+
+	private SyntaxNode* parseExpression(ref int precedence)
+	{
+		auto lhs = parseTerm();
+		auto binaryOperation = parseBinaryOperation(lhs, precedence);
+		if (binaryOperation is null)
+			return lhs.asSyntaxNode;
+		return binaryOperation.asSyntaxNode;
 	}
 }
 
@@ -683,7 +858,7 @@ void main()
 		Operator("/", OperatorArity.binary, OperatorAssociativity.left, 2),
 		Operator("-", OperatorArity.unary, OperatorAssociativity.right, 3),
 	];
-	const input = "(1 + 2) * (3 / a)";
+	const input = "a + b * c - d";
 	// foreach (token; lexArithmetic(input, operators))
 	// 	writeTokenInfo(&token, operators);
 
@@ -691,19 +866,55 @@ void main()
 	auto lexer = bufferArithmeticLexer(underlyingLexer);
 	// BufferingArithmeticLexer!(typeof(underlyingLexer), Mallocator, CyclicBuffer!(Token*, Mallocator))(underlyingLexer, CyclicBuffer!(Token*, Mallocator)());
 	// auto lexer = bufferArithmeticLexer(underlyingLexer);
-	auto parser = Parser!(typeof(lexer), Mallocator)(lexer);
+	auto parser = Parser!(typeof(lexer), Mallocator)(&lexer);
 	auto tree = parser.parse();
 
-	void writeTreeRecursively(ExpressionSyntaxNode* node, int indent)
+	void writeTreeRecursively(SyntaxNode* node, int indent)
 	{
 		if (node is null)
 			return;
 		foreach (i; 0 .. indent)
 			write("  ");
-		write(mode.kind, ": ", node.text);
-		writeln();
-		foreach (child; node.children)
-			writeTreeRecursively(child, indent + 1);
+		write(node.kind);
+		final switch (node.kind)
+		{
+			case SyntaxNodeKind.identifier:
+			{
+				auto ident = cast(IdentifierNode*) node;
+				writeln(": ", ident.token.text);
+				break;
+			}
+			case SyntaxNodeKind.integerLiteral:
+			case SyntaxNodeKind.floatLiteral:
+			{
+				auto literal = cast(LiteralNode*) node;
+				writeln(": ", literal.token.text);
+				break;
+			}
+			case SyntaxNodeKind.invocation:
+			{
+				auto invocation = cast(InvocationNode*) node;
+				writeln(": ", invocation.identifier.token.text);
+				foreach (arg; invocation.arguments)
+					writeTreeRecursively(arg, indent + 1);
+				break;
+			}
+			case SyntaxNodeKind.parenthesizedExpression:
+			{
+				auto expr = cast(ParenthesizedExpressionNode*) node;
+				writeln();
+				writeTreeRecursively(expr.innerExpression, indent + 1);
+				break;
+			}
+			case SyntaxNodeKind.operator:
+			{
+				auto op = cast(OperatorNode*) node;
+				writeln(": ", op.operator.name);
+				foreach (operand; op.operands)
+					writeTreeRecursively(operand, indent + 1);
+				break;
+			}
+		}
 	}
 	writeTreeRecursively(tree.root, 0);
 }

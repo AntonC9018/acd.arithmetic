@@ -6,6 +6,7 @@
 	"description": "A minimal D application.",
 	"license": "proprietary",
 	"name": "arithmetic",
+	"buildOptions-windows": ["debugInfoC"],
 	"dependencies": {
 		"emsi_containers": "~>0.9.0"
 	}
