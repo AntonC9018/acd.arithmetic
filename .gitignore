@@ -1,0 +1,15 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/arithmetic
+arithmetic.so
+arithmetic.dylib
+arithmetic.dll
+arithmetic.a
+arithmetic.lib
+arithmetic-test-*
+*.exe
+*.o
+*.obj
+*.lst
