@@ -1,7 +1,7 @@
 # Arithmetic expression parser
 
 This library is a powerful recursive descent arithmetic expression parser.
-The precedence is handled via the concept of [precedence climbing](arithmetic://eli.thegreenplace.net/2012/08/02/parsing-expressions-by-precedence-climbing).
+The precedence is handled via the concept of [precedence climbing](https://eli.thegreenplace.net/2012/08/02/parsing-expressions-by-precedence-climbing).
 
 > The precedence and associativity is only handled for binary operators, unary operators are always handled as right associative and as having infinite precedence.
 
