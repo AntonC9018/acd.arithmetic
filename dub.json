@@ -5,7 +5,7 @@
 	"copyright": "Copyright © 2022, Anton",
 	"description": "Arithmetic expressions library",
 	"license": "MIT",
-	"name": "arithmetic",
+	"name": "acd-arithmetic",
 	"buildOptions-windows": ["debugInfoC"],
 	"dependencies": {
 		"emsi_containers": "~>0.9.0"
