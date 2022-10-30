@@ -13,3 +13,4 @@ arithmetic-test-*
 *.o
 *.obj
 *.lst
+arithmetic.pdb

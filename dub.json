@@ -1,13 +1,30 @@
 {
 	"authors": [
-		"Anton"
+		"Anton Curmanschii"
 	],
 	"copyright": "Copyright © 2022, Anton",
-	"description": "A minimal D application.",
-	"license": "proprietary",
+	"description": "Arithmetic expressions library",
+	"license": "MIT",
 	"name": "arithmetic",
 	"buildOptions-windows": ["debugInfoC"],
 	"dependencies": {
 		"emsi_containers": "~>0.9.0"
-	}
+	},
+	"configurations": [
+		{
+			"name": "app",
+			"targetType": "executable",
+			"sourceFiles": [
+				"source/app.d",
+				"source/acd/arithmetic/*.d"
+			]
+		},
+		{
+			"name": "library",
+			"targetType": "library",
+			"sourceFiles": [
+				"source/acd/arithmetic/*.d"
+			]
+		}
+	]
 }
