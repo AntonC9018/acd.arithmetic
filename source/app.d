@@ -1,6 +1,8 @@
 import std.stdio;
 import std.meta : Repeat;
 import std.typecons : Nullable, nullable;
+import std.algorithm;
+import std.range;
 
 enum OperatorArity
 {
@@ -668,6 +670,21 @@ struct ExpressionSyntaxTree
     SyntaxNode* root;
 }
 
+struct Location
+{
+    StreamPosition position;
+    
+    void toString(scope void delegate(const(char)[]) sink) const
+    {
+        import std.format;
+        import std.range;
+        sink("at ");
+        formattedWrite!"%d"(sink, position.line);
+        sink(":");
+        formattedWrite!"%d"(sink, position.column + 1);
+    }
+}
+
 struct Parser(TLexer, TAllocator, alias ErrorHandler = writeln)
 {
     private TLexer _lexer;
@@ -678,21 +695,6 @@ struct Parser(TLexer, TAllocator, alias ErrorHandler = writeln)
         private ErrorHandler _errorHandler;
     else
         private alias _errorHandler = ErrorHandler;
-
-    private struct Location
-    {
-        StreamPosition position;
-        
-        void toString(scope void delegate(const(char)[]) sink) const
-        {
-            import std.format;
-            import std.range;
-            sink("at ");
-            formattedWrite!"%d"(sink, position.line);
-            sink(":");
-            formattedWrite!"%d"(sink, position.column + 1);
-        }
-    }
 
     private void error(T...)(auto ref T args)
     {
@@ -916,17 +918,19 @@ enum SymbolKind
 
 TAs reinterpret(TAs, TValue)(TValue value)
 {
-    assert(TValue.sizeof == TAs.sizeof);
+    static assert(TValue.sizeof == TAs.sizeof);
     return *cast(TAs*) &value;
 }
+
+enum maxFunctionArity = 8;
 
 struct Function(TNumber)
 {
     int arity;
     void*[2] delegate_;
 
-    enum maxArity = 8;
-    Nullable!TNumber exec(TNumber[maxArity] arguments)
+    enum maxArity = maxFunctionArity;
+    Nullable!TNumber exec(scope TNumber[] arguments)
     {
         enum null_ = Nullable!TNumber.init;
         if (arguments.length != arity)
@@ -936,13 +940,16 @@ struct Function(TNumber)
         {
             default:
                 return null_;
-            static foreach (i; 0 .. 8)
+            static foreach (i; 0 .. maxFunctionArity)
             {
                 case i:
                 {
                     alias TDelegate = TNumber delegate(Repeat!(i, TNumber));
                     import std.array;
-                    return nullable(reinterpret!TDelegate(arguments[0 .. i].staticArray!i.tupleof));
+                    import std.meta : aliasSeqOf;
+                    TNumber[i] args = arguments[0 .. i];
+                    auto dg = reinterpret!TDelegate(delegate_);
+                    return nullable(dg(args.tupleof));
                 }
             }
         }
@@ -1016,9 +1023,9 @@ struct SymbolTable(TNumber)
 {
     Symbol!TNumber[string] table;
 
-    auto opBinaryRight(string op)(TNumber rhs) if (op == "in")
+    auto opBinaryRight(string op : "in")(string symbolName)
     {
-        return rhs in table;
+        return symbolName in table;
     }
 
     // Support assigning symbols, values or function groups via indexer
@@ -1027,39 +1034,60 @@ struct SymbolTable(TNumber)
         return table[name];
     }
 
-    void opIndexAssign(TNumber variableValue, string variableName)
+    AddContext set(string name)
     {
-        table[variableName] = createSymbol(variableValue);
+        return AddContext(&this, name);
     }
 
-    void opIndexAssign(
-        FunctionOverloadGroup!TNumber functionGroup, string functionName)
+    struct AddContext
     {
-        table[functionName] = createSymbol(functionGroup);
-    }
+        SymbolTable!TNumber* self;
+        string name;
 
-    void opIndexAssign
-    (
-        TDelegate : TNumber delegate(TArgs),
-        TArgs...
-    )
-    (
-        TDelegate dg,
-        string functionName
-    )
-    {
-        table[functionName] = createSymbol(createFunctionGroup!TNumber(dg));
-    }
+        SymbolTable!TNumber* value(TNumber variableValue)
+        {
+            self.table[name] = createSymbol(variableValue);
+            return self;
+        }
 
-    void add(string functionName, TDelegate : TNumber delegate(TArgs), TArgs...)(TDelegate dg)
-    {
-        table[functionName] = createSymbol(createFunctionGroup!TNumber(dg));
+        SymbolTable!TNumber* functionGroup(FunctionOverloadGroup!TNumber functionGroup)
+        {
+            self.table[name] = createSymbol(functionGroup);
+            return self;
+        }
     }
 }
 
+template functions(TDelegates...)
+{
+    SymbolTable!TNumber* functions(TNumber)(SymbolTable!TNumber.AddContext context)
+    {
+        FunctionOverloadGroupBuilder!TNumber group;
+        static foreach (dg; TDelegates)
+        {{
+            import std.traits;
+            alias TArgs = Repeat!(numParameters!(dg, TNumber, maxFunctionArity), TNumber);
+            group.add(delegate(TArgs args) => dg(args));
+        }}
+        context.self.table[context.name] = createSymbol(group.build());
+        return context.self;
+    }
+}
+
+template numParameters(alias TDelegate, TArgument, size_t maxParameters = 8)
+{
+    static foreach (i; 0 .. maxParameters)
+    {
+        static if (__traits(compiles, delegate(Repeat!(i, TArgument) args) => TDelegate(args)))
+            enum numParameters = i;
+    }
+}
+
+
+
 // TODO: move away from aa to a pointer based or index based symbol table.
-TNumber eval(TNumber, TSymbolTable : TT!TNumber, TT, alias error = writeln)(
-    TSymbolTable symbolTable, SyntaxNode* node)
+TNumber eval(TNumber, alias error = writeln)(
+    SymbolTable!TNumber symbolTable, SyntaxNode* node)
 {
     TNumber execFunc(string funcName, SyntaxNode*[] parameters, Location invocationLocation)
     {
@@ -1069,7 +1097,7 @@ TNumber eval(TNumber, TSymbolTable : TT!TNumber, TT, alias error = writeln)(
             error("No function ", funcName, " found at ", invocationLocation);
             return TNumber.init;
         }
-
+        
         auto funcs = symbol.functions_.functions[]
             .find!(f => f.arity == parameters.length);
         if (funcs.empty)
@@ -1080,16 +1108,18 @@ TNumber eval(TNumber, TSymbolTable : TT!TNumber, TT, alias error = writeln)(
         }
 
         auto func = funcs.front;
-        auto arguments = operatorNode.arguments
+        auto arguments = parameters
             .map!(a => eval(symbolTable, a))
             .staticArray!(func.maxArity);
-        auto result = func.exec(arguments);
+        auto result = func.exec(arguments[0 .. parameters.length]);
         if (result.isNull)
         {
             error("Invalid number of arguments for ", funcName,
                 " at ", invocationLocation);
             return TNumber.init;
         }
+
+        return result.get;
     }
 
     final switch (node.kind)
@@ -1110,10 +1140,10 @@ TNumber eval(TNumber, TSymbolTable : TT!TNumber, TT, alias error = writeln)(
         {
             auto ident = cast(IdentifierNode*) node;
 
-            auto symbol = funcName in symbolTable;
+            auto symbol = ident.name in symbolTable;
             if (!symbol)
             {
-                error("Unknown identifier ", ident.name, " at ", ident.location);
+                error("Unknown identifier ", ident.name, " at ", Location(ident.token.startPosition));
                 return TNumber.init;
             }
 
@@ -1128,10 +1158,10 @@ TNumber eval(TNumber, TSymbolTable : TT!TNumber, TT, alias error = writeln)(
         {
             auto operatorNode = cast(OperatorNode*) node;
             auto operator = operatorNode.operator;
-            assert(operator.arity == operatorNode.arguments.length);
+            assert(operator.arity == operatorNode.operands.length);
             return execFunc(
                 operator.name,
-                operatorNode.arguments,
+                operatorNode.operands,
                 Location(operatorNode.operatorToken.startPosition));
         }
 
@@ -1139,15 +1169,15 @@ TNumber eval(TNumber, TSymbolTable : TT!TNumber, TT, alias error = writeln)(
         {
             auto invocation = cast(InvocationNode*) node;
             return execFunc(
-                invocation.name,
+                invocation.identifier.name,
                 invocation.arguments,
-                Location(invocation.openParenthesis.token.startPosition));
+                Location(invocation.openParenthesis.startPosition));
         }
 
         case SyntaxNodeKind.parenthesizedExpression:
         {
             auto parenthesizedExpression = cast(ParenthesizedExpressionNode*) node;
-            return eval(symbolTable, parenthesizedExpression.expression);
+            return eval(symbolTable, parenthesizedExpression.innerExpression);
         }
     }
 }
@@ -1222,28 +1252,18 @@ void main()
             .build(),
     ];
 
-    // construct the symbol table
     import std.math;
     SymbolTable!double symbolTable;
-    symbolTable["pi"] = PI;
-    symbolTable["e"] = E;
-    double t(double x) { return sin(x); }
-    symbolTable.add("sin", (double x) => sin(x)); 
-    symbolTable["sin"] = &t;
-    symbolTable["cos"] = x => cos(x);
-    symbolTable["+"] = createFunctionGroup!double(
-        (x) => x,
-        (x, y) => x + y
-    );
-    symbolTable["-"] = createFunctionGroup!double(
-        (x) => -x,
-        (x, y) => x - y
-    );
-    symbolTable["*"] = (x, y) => x * y;
-    symbolTable["/"] = (x, y) => x / y;
-    symbolTable["^"] = (x, y) => pow(x, y);
-
-
+    symbolTable
+        .set("pi").value(PI)
+        .set("e").value(E)
+        .set("sin").functions!(x => sin(x))
+        .set("cos").functions!(x => cos(x))
+        .set("+").functions!(x => x, (x, y) => x + y)
+        .set("-").functions!(x => -x, (x, y) => x - y)
+        .set("*").functions!((x, y) => x * y)
+        .set("/").functions!((x, y) => x / y)
+        .set("^").functions!((x, y) => pow(x, y));
 
     const input = "1 + 2 ^ 2 * 3";
     // foreach (token; createArithmeticLexer(input, operators))
@@ -1358,5 +1378,9 @@ void main()
         }
     }
     writeTreeRecursively(tree.root, 0);
+
     writeExpressionRecursively(tree.root);
+    writeln();
+
+    writeln(eval!double(symbolTable, tree.root));
 }
