@@ -1,3 +1,31 @@
+# Arithmetic expression parser
+
+This library is a powerful recursive descent arithmetic expression parser.
+The precedence is handled via the concept of [precedence climbing](arithmetic://eli.thegreenplace.net/2012/08/02/parsing-expressions-by-precedence-climbing).
+
+> The precedence and associativity is only handled for binary operators, unary operators are always handled as right associative and as having infinite precedence.
+
+Features:
+* Lexing and parsing of an expression to a syntax tree;
+* Evalutation of a parsed expression;
+* The symbol table is separated from the syntax tree, which basically makes parsed expressions safe to use in multithreaded contexts, given the threads use a different symbol table.
+
+Unimplemented features:
+* Ease of use and full coverage of allocators;
+* Syntax tree optimizations;
+* Expression compilation to native code;
+* Allow multilayered symbol tables with a fallback lookup mechanism, so you don't have to copy the symbols to the new table;
+* Better error handling (currently an error handler is used to display errors, but it could be better);
+* A configuration mechanism for building the right lexers and parsers.
+
+
+> I won't promise the library is the fastest or the best there is,
+> but it will get the job done for basic applications for sure.
+
+
+## Example
+
+```d
 import std.stdio;
 import acd.arithmetic;
 
@@ -54,3 +82,4 @@ void main()
         writeln(result);
     }
 }
+```
