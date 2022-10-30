@@ -35,6 +35,17 @@ struct Parser(TLexer, TAllocator, alias ErrorHandler = writeln)
     else
         private alias _errorHandler = ErrorHandler;
 
+    ExpressionSyntaxTree parse()
+    {
+        int precedence = -1;
+        auto root = parseExpression(precedence);
+
+        auto nextToken = _lexer.peek();
+        if (nextToken !is null)
+            error("Unexpected token ", nextToken.text, " at ", Location(nextToken.startPosition));
+        return ExpressionSyntaxTree(_errorCount > 0, root);
+    }
+
     private void error(T...)(auto ref T args)
     {
         _errorCount++;
@@ -45,17 +56,6 @@ struct Parser(TLexer, TAllocator, alias ErrorHandler = writeln)
     {
         StreamPosition expectedPosition = _lexer.streamPosition;
         error("Unclosed parenthesis ", Location(openParen.startPosition), " (expected one at ", expectedPosition, ")");
-    }
-
-    ExpressionSyntaxTree parse()
-    {
-        int precedence = -1;
-        auto root = parseExpression(precedence);
-
-        auto nextToken = _lexer.peek();
-        if (nextToken !is null)
-            error("Unexpected token ", nextToken.text, " at ", Location(nextToken.startPosition));
-        return ExpressionSyntaxTree(_errorCount > 0, root);
     }
 
     private SyntaxNode* parseTerm()
@@ -256,6 +256,6 @@ ExpressionSyntaxTree parseExpression(string input, OperatorGroup[] operatorGroup
     auto lexerRange = createArithmeticLexer(input, operatorGroups);
     auto lexer = createBufferedLexer(lexerRange, GCAllocator.instance, GCAllocator.instance);
     auto parser = createParser(&lexer, GCAllocator.instance);
-    auto tree = parser.parse(input);
+    auto tree = parser.parse();
     return tree;
 }

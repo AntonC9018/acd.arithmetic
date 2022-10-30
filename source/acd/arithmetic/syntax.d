@@ -232,7 +232,7 @@ abstract class ISyntaxWalker
 {
     void visit(SyntaxNode* node)
     {
-        switch (node.kind)
+        final switch (node.kind)
         {
             case SyntaxNodeKind.operator:
             {

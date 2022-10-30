@@ -16,7 +16,7 @@ void main()
     }
 
     // Prints the expression back in text form.
-    writeExpression(tree.root);
+    writeExpression(expressionTree.root);
 
     // The default symbol table includes trig functions, the constants pi and e,
     // and some common math functions.
@@ -29,10 +29,10 @@ void main()
 
     // You can also add your own functions.
     symbolTable
-        .set("square").functions((double x) => x ^^ 2);
+        .set("square").functions!(x => x ^^ 2);
 
     {
-        double result = eval(symbolTable, tree.root);
+        double result = eval(symbolTable, expressionTree.root);
         writeln(result);
     }
 
@@ -40,7 +40,7 @@ void main()
     symbolTable.set("x").value(2.0);
 
     {
-        double result = eval(symbolTable, tree.root);
+        double result = eval(symbolTable, expressionTree.root);
         writeln(result);
     }
     
@@ -52,7 +52,7 @@ void main()
         return;
     }
     {
-        double result = eval(symbolTable, tree.root);
+        double result = eval(symbolTable, expressionTree.root);
         writeln(result);
     }
 }

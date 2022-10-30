@@ -356,10 +356,11 @@ private void writeExpressionRecursively(SyntaxNode* node)
             auto invocation = cast(InvocationNode*) node;
             write(invocation.identifier.token.text);
             write("(");
-            foreach (arg; invocation.arguments)
+            foreach (i, arg; invocation.arguments)
             {
                 writeExpressionRecursively(arg);
-                write(", ");
+                if (i < invocation.arguments.length - 1)
+                    write(", ");
             }
             write(")");
             break;
