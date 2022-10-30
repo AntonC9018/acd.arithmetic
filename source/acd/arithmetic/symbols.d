@@ -212,7 +212,7 @@ TNumber eval(TNumber, alias error = writeln)(
 
         return result.get;
     }
-
+    assert(node !is null);
     final switch (node.kind)
     {
         case SyntaxNodeKind.integerLiteral:
@@ -273,7 +273,12 @@ TNumber eval(TNumber, alias error = writeln)(
     }
 }
 
-void writeTreeRecursively(SyntaxNode* node, int indent)
+void writeTree(SyntaxNode* root)
+{
+    writeTreeRecursively(root, 0);
+}
+
+private void writeTreeRecursively(SyntaxNode* node, int indent)
 {
     if (node is null)
         return;
@@ -321,7 +326,13 @@ void writeTreeRecursively(SyntaxNode* node, int indent)
     }
 }
 
-void writeExpressionRecursively(SyntaxNode* node)
+void writeExpression(SyntaxNode* root)
+{
+    writeExpressionRecursively(root);
+    writeln();
+}
+
+private void writeExpressionRecursively(SyntaxNode* node)
 {
     if (node is null)
         return;

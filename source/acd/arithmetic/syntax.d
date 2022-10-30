@@ -227,3 +227,73 @@ StreamSpan getWholeSpan(SyntaxNode* node)
         }
     }
 }
+
+abstract class ISyntaxWalker
+{
+    void visit(SyntaxNode* node)
+    {
+        switch (node.kind)
+        {
+            case SyntaxNodeKind.operator:
+            {
+                auto op = cast(OperatorNode*) node;
+                visit(op);
+                break;
+            }
+            case SyntaxNodeKind.identifier:
+            {
+                auto id = cast(IdentifierNode*) node;
+                visit(id);
+                break;
+            }
+            case SyntaxNodeKind.invocation:
+            {
+                auto inv = cast(InvocationNode*) node;
+                visit(inv);
+                break;
+            }
+            case SyntaxNodeKind.parenthesizedExpression:
+            {
+                auto paren = cast(ParenthesizedExpressionNode*) node;
+                visit(paren);
+                break;
+            }
+            case SyntaxNodeKind.integerLiteral:
+            {
+                auto lit = cast(IntegerLiteralNode*) node;
+                visit(lit);
+                break;
+            }
+            case SyntaxNodeKind.floatLiteral:
+            {
+                auto lit = cast(FloatLiteralNode*) node;
+                visit(lit);
+                break;
+            }
+        }
+    }
+    void visit(OperatorNode* node)
+    {
+        foreach (operand; node.operands)
+            visit(operand);
+    }
+    void visit(IdentifierNode* node)
+    {
+    }
+    void visit(InvocationNode* node)
+    {
+        visit(node.identifier);
+        foreach (argument; node.arguments)
+            visit(argument);
+    }
+    void visit(ParenthesizedExpressionNode* node)
+    {
+        visit(node.innerExpression);
+    }
+    void visit(IntegerLiteralNode* node)
+    {
+    }
+    void visit(FloatLiteralNode* node)
+    {
+    }
+}

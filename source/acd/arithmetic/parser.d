@@ -20,6 +20,7 @@ private bool checkOther(Token* token, string otherExpectedText)
 
 struct ExpressionSyntaxTree
 {
+    bool thereHaveBeenErrors;
     SyntaxNode* root;
 }
 
@@ -54,7 +55,7 @@ struct Parser(TLexer, TAllocator, alias ErrorHandler = writeln)
         auto nextToken = _lexer.peek();
         if (nextToken !is null)
             error("Unexpected token ", nextToken.text, " at ", Location(nextToken.startPosition));
-        return ExpressionSyntaxTree(root);
+        return ExpressionSyntaxTree(_errorCount > 0, root);
     }
 
     private SyntaxNode* parseTerm()
@@ -246,4 +247,15 @@ auto createParser
 )
 {
     return Parser!(TLexer, TAllocator, ErrorHandler)(lexer, perhapsNotAllocator!allocator, 0);
+}
+
+// A super simple method that just uses the default allocators and stuff everywhere.
+ExpressionSyntaxTree parseExpression(string input, OperatorGroup[] operatorGroups)
+{
+    import std.experimental.allocator.gc_allocator;
+    auto lexerRange = createArithmeticLexer(input, operatorGroups);
+    auto lexer = createBufferedLexer(lexerRange, GCAllocator.instance, GCAllocator.instance);
+    auto parser = createParser(&lexer, GCAllocator.instance);
+    auto tree = parser.parse(input);
+    return tree;
 }
