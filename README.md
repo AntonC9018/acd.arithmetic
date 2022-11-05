@@ -1,5 +1,7 @@
 # Arithmetic expression parser
 
+> [This package on dub](https://code.dlang.org/packages/acd-arithmetic)
+
 This library is a powerful recursive descent arithmetic expression parser.
 The precedence is handled via the concept of [precedence climbing](https://eli.thegreenplace.net/2012/08/02/parsing-expressions-by-precedence-climbing).
 
