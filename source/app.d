@@ -1,41 +1,12 @@
 import std.stdio;
 import acd.arithmetic;
 
-void main1()
+void main()
 {
-    OperatorGroup[] operatorGroups = 
-    [
-        operatorGroup("-")
-            .add(OperatorArity.unary, OperatorAssociativity.right, 2)
-            .build(),
-        
-        operatorGroup("~")
-            .add(OperatorArity.unary, OperatorAssociativity.right, 3)
-            .build(),
-            
-        operatorGroup("!")
-            .add(OperatorArity.unary, OperatorAssociativity.left, 3)
-            .build(),
-
-        operatorGroup("$")
-            .add(OperatorArity.unary, OperatorAssociativity.left, 4)
-            .build(),
-    ];
-
-    auto expressionTree = parseExpression("-~-~Variable!$!$", operatorGroups);
-    if (expressionTree.thereHaveBeenErrors || expressionTree.root is null)
-    {
-        writeln("Error parsing expression");
-        return;
-    }
-
-    writeExpression(expressionTree.root);
-    writeln();
-    writeTree(expressionTree.root);
+    generalExample();
 }
 
-
-void main()
+void generalExample()
 {
     // The default operators include the basic arithmetic operators.
     OperatorGroup[] operatorGroups = createDefaultOperatorGroups();
@@ -87,4 +58,58 @@ void main()
         double result = eval(symbolTable, expressionTree.root);
         writeln(result);
     }
+}
+
+void multiCharacterOperatorExample()
+{
+    OperatorGroup[] operatorGroups =
+    [
+        operatorGroup("/")
+            .add(OperatorArity.binary, OperatorAssociativity.left, 1)
+            .build(),
+        operatorGroup("/@")
+            .add(OperatorArity.binary, OperatorAssociativity.left, 1)
+            .build(),
+    ];
+    auto expressionTree = parseExpression("1 / 2 /@ 3", operatorGroups);
+    if (expressionTree.thereHaveBeenErrors || expressionTree.root is null)
+    {
+        writeln("Error parsing expression");
+        return;
+    }
+
+    writeExpression(expressionTree.root);
+}
+
+void unaryAssociativityExample()
+{
+    OperatorGroup[] operatorGroups = 
+    [
+        operatorGroup("-")
+            .add(OperatorArity.unary, OperatorAssociativity.right, 2)
+            .build(),
+        
+        operatorGroup("~")
+            .add(OperatorArity.unary, OperatorAssociativity.right, 3)
+            .build(),
+            
+        operatorGroup("!")
+            .add(OperatorArity.unary, OperatorAssociativity.left, 3)
+            .build(),
+
+        operatorGroup("$")
+            .add(OperatorArity.unary, OperatorAssociativity.left, 4)
+            .build(),
+    ];
+
+    auto expressionTree = parseExpression("-~-~Variable!$!$", operatorGroups);
+    if (expressionTree.thereHaveBeenErrors || expressionTree.root is null)
+    {
+        writeln("Error parsing expression");
+        return;
+    }
+
+    writeExpression(expressionTree.root);
+    writeln();
+    writeTree(expressionTree.root);
 }

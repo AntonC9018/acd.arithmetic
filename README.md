@@ -4,8 +4,13 @@ This library is a powerful recursive descent arithmetic expression parser.
 The precedence is handled via the concept of [precedence climbing](https://eli.thegreenplace.net/2012/08/02/parsing-expressions-by-precedence-climbing).
 
 The precedence and associativity are handled for both unary and binary operators.
-For binary operators, associativity indicates how operations are group, e.g. `a + b + c` gets parsed as `((a + b) + c)` if `+` is defined as left associative, and as `(a + (b + c))` if `+` is left associative.
-For unary operators, associativity indicates which side the operator is to be expected.
+For binary operators, associativity indicates how operations are group, e.g. `a + b + c` gets parsed as `((a + b) + c)` if `+` is defined as left associative, and as `(a + (b + c))` if `+` is right associative.
+For unary operators, associativity indicates on which hand side the operator is to be expected.
+
+The parsing is greedy: if an operator can be interpreted as a unary operator, it will.
+
+Also, in case of multicharacter operators, while the longest one will be prioritized, if some longer operator didn't match fully, the smaller one will be selected.
+E.g. if the operators `/@` and `/` have been defined, and the string `a / b` is tried, `/` will be matched.
 
 Features:
 * Lexing and parsing of an expression to a syntax tree;
