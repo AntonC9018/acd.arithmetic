@@ -1,7 +1,7 @@
 import std.stdio;
 import acd.arithmetic;
 
-void main()
+void main1()
 {
     OperatorGroup[] operatorGroups = 
     [
@@ -35,7 +35,7 @@ void main()
 }
 
 
-void main1()
+void main()
 {
     // The default operators include the basic arithmetic operators.
     OperatorGroup[] operatorGroups = createDefaultOperatorGroups();

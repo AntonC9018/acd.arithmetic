@@ -15,7 +15,7 @@ template perhapsNotAllocator(alias T)
         alias perhapsNotAllocator = AliasSeq!();
 }
 
-// TODO: use allocator here, oor prealloc statically.
+// TODO: use allocator here, or prealloc statically.
 struct DynamicArray(T)
 {
     private T[] data;

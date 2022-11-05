@@ -4,6 +4,7 @@ import acd.arithmetic.lexer;
 import acd.arithmetic.operators;
 import acd.arithmetic.internal;
 
+///
 enum SyntaxNodeKind
 {
     @OperatorNode
@@ -25,6 +26,7 @@ enum SyntaxNodeKind
     floatLiteral,
 }
 
+/// Base type for syntax nodes.
 struct SyntaxNode
 {
     SyntaxNodeKind kind;
@@ -35,12 +37,7 @@ struct SyntaxNode
     }
 }
 
-struct ExpressionSyntaxNode
-{
-    SyntaxNode node;
-    alias node this;
-}
-
+///
 struct OperatorNode
 {
     SyntaxNode node;
@@ -51,6 +48,7 @@ struct OperatorNode
     Operator* operator;
 }
 
+///
 struct IdentifierNode
 {
     SyntaxNode node;
@@ -64,6 +62,7 @@ struct IdentifierNode
     }
 }
 
+/// Represents a function invocation.
 struct InvocationNode
 {
     SyntaxNode node;
@@ -85,6 +84,7 @@ struct InvocationNode
     }
 }
 
+///
 struct ParenthesizedExpressionNode
 {
     SyntaxNode node;
@@ -104,6 +104,7 @@ struct ParenthesizedExpressionNode
     }
 }
 
+/// Base type for literal nodes
 struct LiteralNode
 {
     SyntaxNode node;
@@ -112,6 +113,7 @@ struct LiteralNode
     Token* token;
 }
 
+/// Represents literals that have parsed as integers.
 struct IntegerLiteralNode
 {
     LiteralNode literal;
@@ -123,6 +125,7 @@ struct IntegerLiteralNode
     }
 }
 
+/// Represents literals that have parsed as floating point numbers.
 struct FloatLiteralNode
 {
     LiteralNode literal;
@@ -134,6 +137,7 @@ struct FloatLiteralNode
     }
 }
 
+/// Allocates an operator node.
 OperatorNode* emptyOperatorNode(TAllocator)(TAllocator allocator)
 {
     auto node = cast(OperatorNode*) allocator.allocate(OperatorNode.sizeof).ptr;
@@ -141,6 +145,7 @@ OperatorNode* emptyOperatorNode(TAllocator)(TAllocator allocator)
     return node;
 }
 
+/// Creates an operator node.
 OperatorNode* operatorNode(TAllocator)(TAllocator allocator, SyntaxNode*[] operands, Token* operatorToken, Operator* operator)
 {
     auto node = allocator.emptyOperatorNode;
@@ -150,6 +155,7 @@ OperatorNode* operatorNode(TAllocator)(TAllocator allocator, SyntaxNode*[] opera
     return node;
 }
 
+/// Creates an identifier node.
 IdentifierNode* identifierNode(TAllocator)(TAllocator allocator, Token* token)
 {
     auto node = cast(IdentifierNode*) allocator.allocate(IdentifierNode.sizeof).ptr;
@@ -158,6 +164,7 @@ IdentifierNode* identifierNode(TAllocator)(TAllocator allocator, Token* token)
     return node;
 }
 
+/// Creates an invocation node.
 InvocationNode* invocationNode(TAllocator)(TAllocator allocator, IdentifierNode* identifier, Token*[] delimiters, SyntaxNode*[] arguments, Token*[2] parentheses)
 {
     auto node = cast(InvocationNode*) allocator.allocate(InvocationNode.sizeof).ptr;
@@ -169,6 +176,7 @@ InvocationNode* invocationNode(TAllocator)(TAllocator allocator, IdentifierNode*
     return node;
 }
 
+/// Creates a parenthsized expression node.
 ParenthesizedExpressionNode* parenthesizedExpressionNode(TAllocator)(TAllocator allocator, SyntaxNode* innerExpression, Token*[2] parentheses)
 {
     auto node = cast(ParenthesizedExpressionNode*) allocator.allocate(ParenthesizedExpressionNode.sizeof).ptr;
@@ -178,6 +186,7 @@ ParenthesizedExpressionNode* parenthesizedExpressionNode(TAllocator)(TAllocator 
     return node;
 }
 
+/// Creates an integer literal node.
 IntegerLiteralNode* integerLiteralNode(TAllocator)(TAllocator allocator, Token* token)
 {
     auto node = cast(IntegerLiteralNode*) allocator.allocate(IntegerLiteralNode.sizeof).ptr;
@@ -186,6 +195,7 @@ IntegerLiteralNode* integerLiteralNode(TAllocator)(TAllocator allocator, Token* 
     return node;
 }
 
+/// Creates a float literal node.
 FloatLiteralNode* floatLiteralNode(TAllocator)(TAllocator allocator, Token* token)
 {
     auto node = cast(FloatLiteralNode*) allocator.allocate(FloatLiteralNode.sizeof).ptr;
@@ -194,6 +204,7 @@ FloatLiteralNode* floatLiteralNode(TAllocator)(TAllocator allocator, Token* toke
     return node;
 }
 
+///
 StreamSpan getWholeSpan(OperatorNode* operatorNode)
 {
     auto first = getWholeSpan(operatorNode.operands[0]);
@@ -201,6 +212,7 @@ StreamSpan getWholeSpan(OperatorNode* operatorNode)
     return StreamSpan(first.start, last.end);
 }
 
+///
 StreamSpan getWholeSpan(SyntaxNode* node)
 {
     final switch (node.kind)
@@ -234,6 +246,8 @@ StreamSpan getWholeSpan(SyntaxNode* node)
     }
 }
 
+/// This abstract class can be used to visit each node in a syntax tree,
+/// without explicit switches and casts.
 abstract class ISyntaxWalker
 {
     void visit(SyntaxNode* node)

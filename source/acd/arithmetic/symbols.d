@@ -100,14 +100,14 @@ auto createFunctionGroup(TNumber, TDelegates...)(TDelegates delegates)
 
 struct FunctionOverloadGroupBuilder(TNumber)
 {
-    FunctionOverloadGroup!TNumber group;
+    private FunctionOverloadGroup!TNumber group;
 
     ref FunctionOverloadGroupBuilder!TNumber add(TDelegate : TNumber delegate(TArgs), TArgs...)(TDelegate delegate_)
         return
     {
         import std.conv : text;
         import std.algorithm;
-        assert(!group.functions[].any!(f => f.arity == TArgs.length),
+        assert(group.functions[].any!(f => f.arity == TArgs.length) == false,
             text("Function with arity ", TArgs.length, " already exists"));
 
         group.functions ~= createFunction(delegate_);
@@ -120,36 +120,42 @@ struct FunctionOverloadGroupBuilder(TNumber)
     }
 }
 
+/// Lets you assign functions and constants to variables.
 struct SymbolTable(TNumber)
 {
     Symbol!TNumber[string] table;
 
+    ///
     auto opBinaryRight(string op : "in")(string symbolName)
     {
         return symbolName in table;
     }
 
+    ///
     ref Symbol!TNumber opIndex(string name)
     {
         return table[name];
     }
 
-    AddContext set(string name)
+    ///
+    SetSymbolProxy set(string name)
     {
-        return AddContext(&this, name);
+        return SetSymbolProxy(&this, name);
     }
 
-    struct AddContext
+    private struct SetSymbolProxy
     {
-        SymbolTable!TNumber* self;
-        string name;
+        private SymbolTable!TNumber* self;
+        private string name;
 
+        /// Set the symbol to a constant value.
         SymbolTable!TNumber* value(TNumber variableValue)
         {
             self.table[name] = createSymbol(variableValue);
             return self;
         }
 
+        ///
         SymbolTable!TNumber* functionGroup(FunctionOverloadGroup!TNumber functionGroup)
         {
             self.table[name] = createSymbol(functionGroup);
@@ -158,10 +164,10 @@ struct SymbolTable(TNumber)
     }
 }
 
-/// Is supposed to be used as an extension of AddContext.
+/// Is supposed to be used as an extension of SetSymbolProxy.
 template functions(TDelegates...)
 {
-    SymbolTable!TNumber* functions(TNumber)(SymbolTable!TNumber.AddContext context)
+    SymbolTable!TNumber* functions(TNumber)(SymbolTable!TNumber.SetSymbolProxy context)
     {
         FunctionOverloadGroupBuilder!TNumber group;
         static foreach (dg; TDelegates)
@@ -176,7 +182,9 @@ template functions(TDelegates...)
     }
 }
 
-// move away from aa to a pointer based or index based symbol table??
+// TODO: move away from aa to a pointer based or index based symbol table??
+/// Calculates the values of the given syntax tree using the given symbol table.
+/// The errors are reported via the second template parameter.
 TNumber eval(TNumber, alias error = writeln)(
     SymbolTable!TNumber symbolTable, SyntaxNode* node)
 {
@@ -273,6 +281,7 @@ TNumber eval(TNumber, alias error = writeln)(
     }
 }
 
+///
 void writeTree(SyntaxNode* root)
 {
     writeTreeRecursively(root, 0);
@@ -326,6 +335,7 @@ private void writeTreeRecursively(SyntaxNode* node, int indent)
     }
 }
 
+/// Writes the expression to the console in an explicit form, highlighting operator precedence.
 void writeExpression(SyntaxNode* root)
 {
     writeExpressionRecursively(root);
@@ -401,6 +411,7 @@ private void writeExpressionRecursively(SyntaxNode* node)
     }
 }
 
+/// Flags enum used for default symbol table customization.
 enum CommonSymbolCategories
 {
     default_,
@@ -414,6 +425,9 @@ enum CommonSymbolCategories
     all = constants | classicTrigonometry | inverseTrigonometry | hyperbolicTrigonometry | inverseHyperbolicTrigonometry | arithmetic | commonNumericFunctions,
 }
 
+/// Creates the default symbol table, which includes some constants,
+/// trigonometric functions, functions for the arithmetic operators,
+/// and some other useful numeric functions.
 SymbolTable!TNumber createDefaultSymbolTable(TNumber = double)(CommonSymbolCategories includeCategories = CommonSymbolCategories.default_)
 {
     import std.math;

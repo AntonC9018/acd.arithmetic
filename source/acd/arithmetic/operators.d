@@ -51,8 +51,8 @@ Operator* findOperatorByArity(OperatorGroup* group, OperatorArity arity)
 // TODO: use a container and an allocator.
 struct OperatorGroupBuilder
 {
-    string name;
-    OperatorGroup group;
+    private string name;
+    private OperatorGroup group;
 
     ref OperatorGroupBuilder add(OperatorArity arity, OperatorAssociativity associativity, int precedence) return
     {

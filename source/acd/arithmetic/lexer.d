@@ -13,14 +13,17 @@ enum TokenKind
     identifier,
     integerLiteral,
     floatLiteral,
+
+    /// Includes parentheses and any symbols
+    /// that weren't recognized as one of the other kinds.
     other,
 }
 
 struct Token
 {
     StreamSpan span;
-    ref inout(StreamPosition) startPosition() inout return{ return span.start; }
-    ref inout(StreamPosition) endPosition() inout return{ return span.end; }
+    ref inout(StreamPosition) startPosition() inout return { return span.start; }
+    ref inout(StreamPosition) endPosition() inout return { return span.end; }
 
     string text;
     TokenKind kind;
