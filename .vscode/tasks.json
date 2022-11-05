@@ -8,7 +8,8 @@
             "problemMatcher": [
                 "$dmd"
             ],
-            "group": "build"
+            "group": "build",
+            "configuration": "app"
         }
     ]
 }

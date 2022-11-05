@@ -377,11 +377,23 @@ private void writeExpressionRecursively(SyntaxNode* node)
         {
             auto op = cast(OperatorNode*) node;
             write("(");
-            foreach (i, operand; op.operands)
+            if (op.operator.arity == 2)
             {
-                writeExpressionRecursively(operand);
-                if (i < op.operands.length - 1)
-                    write(" ", op.operator.name, " ");
+                foreach (i, operand; op.operands)
+                {
+                    writeExpressionRecursively(operand);
+                    if (i < op.operands.length - 1)
+                        write(" ", op.operator.name, " ");
+                }
+            }
+            else if (op.operator.arity == 1)
+            {
+                bool t = op.operator.associativity == OperatorAssociativity.right;
+                if (t)
+                    write(op.operator.name);
+                writeExpressionRecursively(op.operands[0]);
+                if (!t)
+                    write(op.operator.name);
             }
             write(")");
             break;

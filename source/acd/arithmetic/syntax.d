@@ -134,13 +134,19 @@ struct FloatLiteralNode
     }
 }
 
-OperatorNode* operatorNode(TAllocator)(TAllocator allocator, SyntaxNode*[] operands, Token* operatorToken, Operator* operator)
+OperatorNode* emptyOperatorNode(TAllocator)(TAllocator allocator)
 {
     auto node = cast(OperatorNode*) allocator.allocate(OperatorNode.sizeof).ptr;
+    node.kind = SyntaxNodeKind.operator;
+    return node;
+}
+
+OperatorNode* operatorNode(TAllocator)(TAllocator allocator, SyntaxNode*[] operands, Token* operatorToken, Operator* operator)
+{
+    auto node = allocator.emptyOperatorNode;
     node.operands = operands;
     node.operatorToken = operatorToken;
     node.operator = operator;
-    node.kind = SyntaxNodeKind.operator;
     return node;
 }
 

@@ -33,7 +33,6 @@ struct Operator
 
 struct OperatorGroup
 {
-    string fullName;
     Operator[] operators;
     string name() const { return operators[0].name; }
 }
@@ -51,7 +50,6 @@ Operator* findOperatorByArity(OperatorGroup* group, OperatorArity arity)
 // TODO: use a container and an allocator.
 struct OperatorGroupBuilder
 {
-    string fullName;
     string name;
     OperatorGroup group;
 
@@ -72,34 +70,34 @@ struct OperatorGroupBuilder
     }
 }
 
-OperatorGroupBuilder operatorGroup(string fullName, string name)
+OperatorGroupBuilder operatorGroup(string name)
 {
-    return OperatorGroupBuilder(fullName, name, OperatorGroup());
+    return OperatorGroupBuilder(name, OperatorGroup());
 }
 
 OperatorGroup[] createDefaultOperatorGroups()
 {
     OperatorGroup[] operatorGroups =
     [
-        operatorGroup("addition", "+")
+        operatorGroup("+")
             .add(OperatorArity.binary, OperatorAssociativity.left, 1)
             .add(OperatorArity.unary, OperatorAssociativity.right, 2)
             .build(),
 
-        operatorGroup("subtraction", "-")
+        operatorGroup("-")
             .add(OperatorArity.binary, OperatorAssociativity.left, 1)
             .add(OperatorArity.unary, OperatorAssociativity.right, 2)
             .build(),
 
-        operatorGroup("multiplication", "*")
+        operatorGroup("*")
             .add(OperatorArity.binary, OperatorAssociativity.left, 3)
             .build(),
 
-        operatorGroup("division", "/")
+        operatorGroup("/")
             .add(OperatorArity.binary, OperatorAssociativity.left, 3)
             .build(),
 
-        operatorGroup("exponentiation", "^")
+        operatorGroup("^")
             .add(OperatorArity.binary, OperatorAssociativity.right, 4)
             .build(),
     ];

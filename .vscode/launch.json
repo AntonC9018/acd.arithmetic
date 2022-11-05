@@ -10,7 +10,7 @@
             "name": "Debug D project",
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "build",
-            "program": "./arithmetic.exe"
+            "program": "./acd-arithmetic.exe"
         }
     ]
 }

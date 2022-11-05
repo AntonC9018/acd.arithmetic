@@ -42,7 +42,7 @@ struct Parser(TLexer, TAllocator, alias ErrorHandler = writeln)
 
         auto nextToken = _lexer.peek();
         if (nextToken !is null)
-            error("Unexpected token ", nextToken.text, " at ", Location(nextToken.startPosition));
+            error("Unexpected token ", nextToken.text," at ", Location(nextToken.startPosition));
         return ExpressionSyntaxTree(_errorCount > 0, root);
     }
 
@@ -55,10 +55,11 @@ struct Parser(TLexer, TAllocator, alias ErrorHandler = writeln)
     private void errorUnclosedParens(Token* openParen)
     {
         StreamPosition expectedPosition = _lexer.streamPosition;
-        error("Unclosed parenthesis ", Location(openParen.startPosition), " (expected one at ", Location(expectedPosition), ")");
+        error("Unclosed parenthesis ", Location(openParen.startPosition),
+            " (expected one at ", Location(expectedPosition), ")");
     }
 
-    private SyntaxNode* parseTerm()
+    private SyntaxNode* parseTermLhs()
     {
         auto token = _lexer.peek();
         if (token is null)
@@ -152,28 +153,118 @@ struct Parser(TLexer, TAllocator, alias ErrorHandler = writeln)
             }
             case TokenKind.operator:
             {
-                auto unaryOperator = token.operatorGroup.findOperatorByArity(OperatorArity.unary);
-                if (unaryOperator is null)
-                {
-                    error("Found non-unary operator ", token.text,
-                        " while expecting a term, possibly prefixed by a unary operator at ",
-                        Location(token.startPosition));
-                    return null;
-                }
-                {
-                    _lexer.pop();
-                    int precedence = -1;
-                    auto rhs = parseExpression(precedence);
-                    if (rhs is null)
-                    {
-                        error("Expected an expression after the unary operator ", token.text);
-                        return null;
-                    }
-                    return allocator.operatorNode([rhs], token, unaryOperator).asSyntaxNode;
-                }	
+                error("Not expecting an operator ", token.text, " at ", Location(token.startPosition));
+                return null;
             }
         }
-        assert(false);
+    }
+
+
+    private SyntaxNode* parseTerm()
+    {
+        import containers.dynamicarray;
+        import std.traits : Unqual;
+        alias QueueType = DynamicArray!(OperatorNode*, TAllocator);
+
+        enum AssociativityFilterResult
+        {
+            error,
+            stop,
+            keep,
+        }
+
+        bool popOperators(alias associativityFilter)(ref QueueType queue)
+        {
+            while (true)
+            {
+                auto token = _lexer.peek();
+                if (token is null)
+                    return true;
+
+                if (token.kind != TokenKind.operator)
+                    return true;
+
+                auto operator = token.operatorGroup.findOperatorByArity(OperatorArity.unary);
+
+                AssociativityFilterResult associativityResult = associativityFilter(operator, token);
+                if (associativityResult == AssociativityFilterResult.error)
+                    return false;
+                if (associativityResult == AssociativityFilterResult.stop)
+                    return true;
+
+                auto operatorNode = allocator.emptyOperatorNode;
+                operatorNode.operator = operator; 
+                operatorNode.operatorToken = token;
+                queue ~= operatorNode;
+                _lexer.pop();
+            }
+        }
+
+        auto lhsUnaryOperators = QueueType(perhapsNotAllocator!allocator);
+        popOperators!((op, token)
+        {
+            if (op is null)
+                return AssociativityFilterResult.error;
+            if (op.associativity == OperatorAssociativity.right)
+                return AssociativityFilterResult.keep;
+            error("Expecting the unary operator to be right associative at ", Location(token.startPosition));
+            return AssociativityFilterResult.error;
+        })(lhsUnaryOperators);
+
+        auto term = parseTermLhs();
+        if (term is null)
+            return null;
+
+        auto rhsUnaryOperators = QueueType(perhapsNotAllocator!allocator);
+        popOperators!((op, token)
+        {
+            if (op is null)
+                return AssociativityFilterResult.stop;
+            if (op.associativity == OperatorAssociativity.left)
+                return AssociativityFilterResult.keep;
+            error("Expecting the unary operator to be left associative at ", Location(token.startPosition));
+            return AssociativityFilterResult.error;
+        })(rhsUnaryOperators);
+
+        auto lhsOperatorsRange = lhsUnaryOperators[].retro;
+        auto rhsOperatorsRange = rhsUnaryOperators[];
+
+        // Wrap the term into unary operator nodes conform to their precedence
+        SyntaxNode* node = term;
+        while (!lhsOperatorsRange.empty && !rhsOperatorsRange.empty)
+        {
+            OperatorNode* operatorNode;
+            auto lhsOperator = lhsOperatorsRange.front;
+            auto rhsOperator = rhsOperatorsRange.front;
+            if (lhsOperator.operator.precedence >= rhsOperator.operator.precedence)
+            {
+                operatorNode = lhsOperator;
+                lhsOperatorsRange.popFront();
+            }
+            else
+            {
+                operatorNode = rhsOperator;
+                rhsOperatorsRange.popFront();
+            }
+            operatorNode.operands = [node];
+            node = operatorNode.asSyntaxNode;
+        }
+        while (!lhsOperatorsRange.empty)
+        {
+            auto operatorNode = lhsOperatorsRange.front;
+            operatorNode.operands = [node];
+            node = operatorNode.asSyntaxNode;
+            lhsOperatorsRange.popFront();
+        }
+        while (!rhsOperatorsRange.empty)
+        {
+            auto operatorNode = rhsOperatorsRange.front;
+            operatorNode.operands = [node];
+            node = operatorNode.asSyntaxNode;
+            rhsOperatorsRange.popFront();
+        }
+
+        return node;
     }
 
     private OperatorNode* parseBinaryOperation(SyntaxNode* lhs, int precedence)
