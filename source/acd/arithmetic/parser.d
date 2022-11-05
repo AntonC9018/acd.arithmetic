@@ -55,7 +55,7 @@ struct Parser(TLexer, TAllocator, alias ErrorHandler = writeln)
     private void errorUnclosedParens(Token* openParen)
     {
         StreamPosition expectedPosition = _lexer.streamPosition;
-        error("Unclosed parenthesis ", Location(openParen.startPosition), " (expected one at ", expectedPosition, ")");
+        error("Unclosed parenthesis ", Location(openParen.startPosition), " (expected one at ", Location(expectedPosition), ")");
     }
 
     private SyntaxNode* parseTerm()
@@ -213,8 +213,6 @@ struct Parser(TLexer, TAllocator, alias ErrorHandler = writeln)
         return binaryOperation;
     }
 
-    // TODO: introduce precedence conform the paper
-    // https://eli.thegreenplace.net/2012/08/02/parsing-expressions-by-precedence-climbing
     private SyntaxNode* parseExpression(int precedence)
     {
         auto lhs = parseTerm();
