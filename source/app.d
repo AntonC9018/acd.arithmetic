@@ -30,7 +30,8 @@ void main()
     }
 
     writeExpression(expressionTree.root);
-    // writeTree(expressionTree.root);
+    writeln();
+    writeTree(expressionTree.root);
 }
 
 

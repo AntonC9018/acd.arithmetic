@@ -3,7 +3,9 @@
 This library is a powerful recursive descent arithmetic expression parser.
 The precedence is handled via the concept of [precedence climbing](https://eli.thegreenplace.net/2012/08/02/parsing-expressions-by-precedence-climbing).
 
-> The precedence and associativity is only handled for binary operators, unary operators are always handled as right associative and as having infinite precedence.
+The precedence and associativity are handled for both unary and binary operators.
+For binary operators, associativity indicates how operations are group, e.g. `a + b + c` gets parsed as `((a + b) + c)` if `+` is defined as left associative, and as `(a + (b + c))` if `+` is left associative.
+For unary operators, associativity indicates which side the operator is to be expected.
 
 Features:
 * Lexing and parsing of an expression to a syntax tree;
@@ -23,7 +25,7 @@ Unimplemented features:
 > but it will get the job done for basic applications for sure.
 
 
-## Example
+## Examples
 
 ```d
 import std.stdio;
@@ -81,5 +83,58 @@ void main()
         double result = eval(symbolTable, expressionTree.root);
         writeln(result);
     }
+}
+```
+
+
+```d
+import std.stdio;
+import acd.arithmetic;
+
+void main()
+{
+    OperatorGroup[] operatorGroups = 
+    [
+        operatorGroup("-")
+            .add(OperatorArity.unary, OperatorAssociativity.right, 2)
+            .build(),
+        
+        operatorGroup("~")
+            .add(OperatorArity.unary, OperatorAssociativity.right, 3)
+            .build(),
+            
+        operatorGroup("!")
+            .add(OperatorArity.unary, OperatorAssociativity.left, 3)
+            .build(),
+
+        operatorGroup("$")
+            .add(OperatorArity.unary, OperatorAssociativity.left, 4)
+            .build(),
+    ];
+
+    auto expressionTree = parseExpression("-~-~Variable!$!$", operatorGroups);
+    if (expressionTree.thereHaveBeenErrors || expressionTree.root is null)
+    {
+        writeln("Error parsing expression");
+        return;
+    }
+
+    writeExpression(expressionTree.root);
+    writeln();
+    writeTree(expressionTree.root);
+
+    /*
+      (-(~(-(((((~Variable)!)$)!)$))))
+
+      operator: -
+        operator: ~
+          operator: -
+            operator: $
+              operator: !
+                operator: $
+                  operator: !
+                    operator: ~
+                      identifier: Variable
+    */
 }
 ```

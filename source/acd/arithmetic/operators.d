@@ -19,8 +19,9 @@ bool isBinary(OperatorArity arity)
 
 enum OperatorAssociativity
 {
-    left,
-    right,
+    left = 1 << 1,
+    right = 1 << 2,
+    both = left | right,
 }
 
 struct Operator
@@ -57,8 +58,18 @@ struct OperatorGroupBuilder
     {
         import std.algorithm;
         import std.range;
-        assert(group.operators[].find!((ref op) => op.arity == arity).empty,
+        assert(group.operators[].canFind!((ref op) => op.arity == arity) == false,
             "Trying to add an operator variant with the same arity");
+        if (arity > OperatorArity.unary)
+        {
+            if ((associativity & OperatorAssociativity.both) == OperatorAssociativity.both)
+                assert(false, "Binary operators cannot be both left and right associative");
+        }
+        if (associativity == 0)
+        {
+            assert(false, "Operators must either left or right associative"
+                ~ "(or both in case unary operators)/");
+        }
 
         group.operators ~= Operator(name, cast(int) arity, associativity, precedence);
         return this;

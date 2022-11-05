@@ -388,7 +388,7 @@ private void writeExpressionRecursively(SyntaxNode* node)
             }
             else if (op.operator.arity == 1)
             {
-                bool t = op.operator.associativity == OperatorAssociativity.right;
+                auto t = op.operator.associativity & OperatorAssociativity.right;
                 if (t)
                     write(op.operator.name);
                 writeExpressionRecursively(op.operands[0]);

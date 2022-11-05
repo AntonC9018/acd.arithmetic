@@ -203,10 +203,16 @@ struct Parser(TLexer, TAllocator, alias ErrorHandler = writeln)
         auto lhsUnaryOperators = QueueType(perhapsNotAllocator!allocator);
         popOperators!((op, token)
         {
+            // arity is not unary
             if (op is null)
+            {
+                error("Expecting the operator to be unary at ", Location(token.startPosition));
                 return AssociativityFilterResult.error;
-            if (op.associativity == OperatorAssociativity.right)
+            }
+  
+            if (op.associativity & OperatorAssociativity.right)
                 return AssociativityFilterResult.keep;
+  
             error("Expecting the unary operator to be right associative at ", Location(token.startPosition));
             return AssociativityFilterResult.error;
         })(lhsUnaryOperators);
@@ -220,8 +226,14 @@ struct Parser(TLexer, TAllocator, alias ErrorHandler = writeln)
         {
             if (op is null)
                 return AssociativityFilterResult.stop;
-            if (op.associativity == OperatorAssociativity.left)
+
+            // Prevent the case where there's both a binary and a unary operator for the same token.
+            if (token.operatorGroup.operators.length > 1)
+                return AssociativityFilterResult.stop;
+
+            if (op.associativity & OperatorAssociativity.left)
                 return AssociativityFilterResult.keep;
+
             error("Expecting the unary operator to be left associative at ", Location(token.startPosition));
             return AssociativityFilterResult.error;
         })(rhsUnaryOperators);
@@ -290,7 +302,7 @@ struct Parser(TLexer, TAllocator, alias ErrorHandler = writeln)
 
         _lexer.pop();
         int rhsPrecedence = binaryOperator.precedence;
-        if (binaryOperator.associativity == OperatorAssociativity.left)
+        if (binaryOperator.associativity & OperatorAssociativity.left)
             rhsPrecedence += 1;
 
         auto rhs = parseExpression(rhsPrecedence);
