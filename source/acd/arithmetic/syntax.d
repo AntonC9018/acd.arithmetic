@@ -246,9 +246,14 @@ StreamSpan getWholeSpan(SyntaxNode* node)
     }
 }
 
+void walk(SyntaxWalker walker, SyntaxNode* node)
+{
+    walker.visit(node);
+}
+
 /// This abstract class can be used to visit each node in a syntax tree,
 /// without explicit switches and casts.
-abstract class ISyntaxWalker
+abstract class SyntaxWalker
 {
     void visit(SyntaxNode* node)
     {
