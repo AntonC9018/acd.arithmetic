@@ -96,6 +96,35 @@ private struct ArithmeticLexerRange(TRange)
         return _currentToken;
     }
 
+    private void skipWhitespace()
+    {
+        while (!_input.empty)
+        {
+            switch (_input.front)
+            {
+                default:
+                    return;
+
+                case '\r':
+                case ' ':
+                case '\t':
+                {
+                    _currentPosition.column++;
+                    _input.popFront();
+                    break;
+                }
+                case '\n':
+                {
+                    _currentPosition.line++;
+                    _currentPosition.column = 0;
+                    _input.popFront();
+                    _currentLine = _input.save;
+                    break;
+                }
+            }
+        }
+    }
+
     /// Matches the next token in the stream.
     void popFront()
     {
@@ -105,38 +134,6 @@ private struct ArithmeticLexerRange(TRange)
             _empty = true;
             return;
         }
-        void skipWhitespace()
-        {
-            while (!_input.empty)
-            {
-                switch (_input.front)
-                {
-                    default:
-                        return;
-
-                    case '\r':
-                    case ' ':
-                    case '\t':
-                    {
-                        _currentPosition.column++;
-                        _input.popFront();
-                        break;
-                    }
-                    case '\n':
-                    {
-                        _currentPosition.line++;
-                        _currentPosition.column = 0;
-                        _input.popFront();
-                        _currentLine = _input.save;
-                        break;
-                    }
-                }
-            }
-        }
-        skipWhitespace();
-
-        if (_input.empty)
-            return;
 
         void popSingleCharacter()
         {
@@ -243,6 +240,7 @@ auto createArithmeticLexer(TRange)(
 {
     auto lexer = ArithmeticLexerRange!(TRange)(operatorGroups, range, range, startPosition);
     lexer._matchingOperatorGroupsCache = typeof(lexer._matchingOperatorGroupsCache)(4);
+    lexer.skipWhitespace();
     lexer.popFront();
     return lexer;
 }

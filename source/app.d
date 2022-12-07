@@ -3,15 +3,17 @@ import acd.arithmetic;
 
 void main()
 {
-    generalExample();
+    OperatorGroup[] operatorGroups = createDefaultOperatorGroups();
+    foreach (t; createArithmeticLexer("(a + b * c) - (a * b * c)", operatorGroups))
+        writeln(t);
 }
 
 void generalExample()
 {
     // The default operators include the basic arithmetic operators.
     OperatorGroup[] operatorGroups = createDefaultOperatorGroups();
-
-    auto expressionTree = parseExpression("x + y ^ 2 * sin(x)", operatorGroups);
+    
+    auto expressionTree = parseExpression("(a + b * c) - (a * b * c)", operatorGroups);
     if (expressionTree.thereHaveBeenErrors || expressionTree.root is null)
     {
         writeln("Error parsing expression");
