@@ -3,9 +3,7 @@ import acd.arithmetic;
 
 void main()
 {
-    OperatorGroup[] operatorGroups = createDefaultOperatorGroups();
-    foreach (t; createArithmeticLexer("(a + b * c) - (a * b * c)", operatorGroups))
-        writeln(t);
+    generalExample();
 }
 
 void generalExample()
